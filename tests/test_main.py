@@ -1,3 +1,4 @@
+from unittest.mock import Mock
 import json
 import os
 import tempfile
@@ -6,7 +7,7 @@ from unittest.mock import MagicMock, Mock, call, mock_open, patch
 import pytest
 import requests
 
-from main import (
+from spotiplaylist.main import (
     authenticate,
     fetch_genres,
     fetch_tracks,
@@ -18,7 +19,7 @@ from main import (
 
 
 @pytest.fixture(autouse=True)
-def disable_tqdm(monkeypatch):
+def disable_tqdm(monkeypatch) -> None:
     """Replace tqdm with a pass-through iterator for deterministic tests."""
     monkeypatch.setattr("main.tqdm", lambda iterable, **_: iterable)
 
@@ -34,11 +35,11 @@ def disable_tqdm(monkeypatch):
         (3661000, "61:01"),
     ],
 )
-def test_ms_to_time_formats_durations(milliseconds, expected):
+def test_ms_to_time_formats_durations(milliseconds, expected) -> None:
     assert ms_to_time(milliseconds) == expected
 
 
-def test_ms_to_time_rejects_negative_values():
+def test_ms_to_time_rejects_negative_values() -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
         ms_to_time(-1)
 
@@ -55,12 +56,12 @@ def test_ms_to_time_rejects_negative_values():
         ("/playlist/2qOyhfKK44u2USaxUyqDVn/", "2qOyhfKK44u2USaxUyqDVn"),
     ],
 )
-def test_normalize_playlist_id_handles_ids_and_urls(raw_value, expected):
+def test_normalize_playlist_id_handles_ids_and_urls(raw_value, expected) -> None:
     assert normalize_playlist_id(raw_value) == expected
 
 
 @patch("main.load_dotenv")
-def test_authenticate_missing_env_var(_mock_load_dotenv, monkeypatch):
+def test_authenticate_missing_env_var(_mock_load_dotenv, monkeypatch) -> None:
     monkeypatch.delenv("SPOTIPY_CLIENT_ID", raising=False)
     monkeypatch.delenv("SPOTIPY_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("SPOTIPY_REDIRECT_URI", raising=False)
@@ -80,7 +81,7 @@ def test_authenticate_returns_client_and_lastfm_key(
     mock_spotify_client,
     _mock_load_dotenv,
     monkeypatch,
-):
+) -> None:
     monkeypatch.setenv("SPOTIPY_CLIENT_ID", "client-id")
     monkeypatch.setenv("SPOTIPY_CLIENT_SECRET", "client-secret")
     monkeypatch.setenv("SPOTIPY_REDIRECT_URI", "http://127.0.0.1:8888/callback")
@@ -104,7 +105,7 @@ def test_authenticate_returns_client_and_lastfm_key(
     mock_spotify_client.assert_called_once_with(auth_manager=auth_manager)
 
 
-def make_track_item(name="Song", artist="Artist", album="Album", duration_ms=200000):
+def make_track_item(name: str="Song", artist: str="Artist", album: str="Album", duration_ms: int=200000):
     return {
         "item": {
             "type": "track",
@@ -116,7 +117,7 @@ def make_track_item(name="Song", artist="Artist", album="Album", duration_ms=200
     }
 
 
-def make_episode_item():
+def make_episode_item() -> dict[str, dict[str, int | str]]:
     return {
         "item": {
             "type": "episode",
@@ -130,7 +131,7 @@ def make_results(items, has_next=False):
     return {"items": items, "next": "http://next-page" if has_next else None}
 
 
-def test_fetch_tracks_normal_track():
+def test_fetch_tracks_normal_track() -> None:
     sp = MagicMock()
     sp.playlist_items.return_value = make_results([make_track_item()])
 
@@ -147,7 +148,7 @@ def test_fetch_tracks_normal_track():
     assert artists == {"Artist"}
 
 
-def test_fetch_tracks_skips_none_items():
+def test_fetch_tracks_skips_none_items() -> None:
     sp = MagicMock()
     sp.playlist_items.return_value = make_results([{"item": None}])
 
@@ -157,7 +158,7 @@ def test_fetch_tracks_skips_none_items():
     assert artists == set()
 
 
-def test_fetch_tracks_skips_episodes():
+def test_fetch_tracks_skips_episodes() -> None:
     sp = MagicMock()
     sp.playlist_items.return_value = make_results([make_episode_item()])
 
@@ -167,7 +168,7 @@ def test_fetch_tracks_skips_episodes():
     assert artists == set()
 
 
-def test_fetch_tracks_skips_malformed_track():
+def test_fetch_tracks_skips_malformed_track() -> None:
     sp = MagicMock()
     malformed_track = {
         "item": {
@@ -186,11 +187,11 @@ def test_fetch_tracks_skips_malformed_track():
     assert artists == set()
 
 
-def test_fetch_tracks_skips_negative_duration():
+def test_fetch_tracks_skips_negative_duration() -> None:
     sp = MagicMock()
-    sp.playlist_items.return_value = make_results(
-        [make_track_item(name="Impossible Song", duration_ms=-1)]
-    )
+    sp.playlist_items.return_value = make_results([
+        make_track_item(name="Impossible Song", duration_ms=-1)
+    ])
 
     songs, artists = fetch_tracks(sp, "playlist_id")
 
@@ -198,7 +199,7 @@ def test_fetch_tracks_skips_negative_duration():
     assert artists == set()
 
 
-def test_fetch_tracks_mixed_playlist():
+def test_fetch_tracks_mixed_playlist() -> None:
     sp = MagicMock()
     items = [
         make_track_item(name="Real Song", artist="Real Artist"),
@@ -220,7 +221,7 @@ def test_fetch_tracks_mixed_playlist():
     assert artists == {"Real Artist"}
 
 
-def test_fetch_tracks_pagination():
+def test_fetch_tracks_pagination() -> None:
     sp = MagicMock()
     page_one = make_results([make_track_item(name="Song 1", artist="A")], has_next=True)
     page_two = make_results([make_track_item(name="Song 2", artist="B")])
@@ -236,7 +237,7 @@ def test_fetch_tracks_pagination():
     sp.next.assert_called_once_with(page_one)
 
 
-def test_fetch_tracks_empty_playlist():
+def test_fetch_tracks_empty_playlist() -> None:
     sp = MagicMock()
     sp.playlist_items.return_value = make_results([])
 
@@ -246,15 +247,13 @@ def test_fetch_tracks_empty_playlist():
     assert artists == set()
 
 
-def test_fetch_tracks_deduplicates_artists():
+def test_fetch_tracks_deduplicates_artists() -> None:
     sp = MagicMock()
-    sp.playlist_items.return_value = make_results(
-        [
-            make_track_item(name="Song 1", artist="Same Artist"),
-            make_track_item(name="Song 2", artist="Same Artist"),
-            make_track_item(name="Song 3", artist="Different Artist"),
-        ]
-    )
+    sp.playlist_items.return_value = make_results([
+        make_track_item(name="Song 1", artist="Same Artist"),
+        make_track_item(name="Song 2", artist="Same Artist"),
+        make_track_item(name="Song 3", artist="Different Artist"),
+    ])
 
     songs, artists = fetch_tracks(sp, "playlist_id")
 
@@ -262,7 +261,7 @@ def test_fetch_tracks_deduplicates_artists():
     assert artists == {"Same Artist", "Different Artist"}
 
 
-def make_lastfm_response(payload, *, from_cache=True):
+def make_lastfm_response(payload, *, from_cache=True) -> Mock:
     response = Mock()
     response.from_cache = from_cache
     response.raise_for_status = Mock()
@@ -271,17 +270,15 @@ def make_lastfm_response(payload, *, from_cache=True):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_success(mock_get):
-    mock_get.return_value = make_lastfm_response(
-        {
-            "toptags": {
-                "tag": [
-                    {"name": "thrash metal", "count": 100},
-                    {"name": "metal", "count": 50},
-                ]
-            }
+def test_fetch_genres_success(mock_get) -> None:
+    mock_get.return_value = make_lastfm_response({
+        "toptags": {
+            "tag": [
+                {"name": "thrash metal", "count": 100},
+                {"name": "metal", "count": 50},
+            ]
         }
-    )
+    })
 
     artist_genre, metrics = fetch_genres("fake_api_key", {"Metallica", "Anthrax"})
 
@@ -293,7 +290,7 @@ def test_fetch_genres_success(mock_get):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_handles_missing_tags(mock_get):
+def test_fetch_genres_handles_missing_tags(mock_get) -> None:
     mock_get.return_value = make_lastfm_response({"toptags": {"tag": []}})
 
     artist_genre, metrics = fetch_genres("fake_api_key", {"Unknown Band"})
@@ -303,7 +300,7 @@ def test_fetch_genres_handles_missing_tags(mock_get):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_handles_invalid_json_response(mock_get):
+def test_fetch_genres_handles_invalid_json_response(mock_get) -> None:
     response = make_lastfm_response({"unused": "value"})
     response.json.side_effect = json.JSONDecodeError("bad json", "doc", 0)
     mock_get.return_value = response
@@ -315,7 +312,7 @@ def test_fetch_genres_handles_invalid_json_response(mock_get):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_handles_non_object_json_payload(mock_get):
+def test_fetch_genres_handles_non_object_json_payload(mock_get) -> None:
     response = make_lastfm_response({"unused": "value"})
     response.json.return_value = ["unexpected", "payload"]
     mock_get.return_value = response
@@ -327,7 +324,7 @@ def test_fetch_genres_handles_non_object_json_payload(mock_get):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_handles_network_error(mock_get):
+def test_fetch_genres_handles_network_error(mock_get) -> None:
     mock_get.side_effect = requests.exceptions.RequestException("Network error")
 
     artist_genre, metrics = fetch_genres("fake_api_key", {"Some Band"})
@@ -337,20 +334,22 @@ def test_fetch_genres_handles_network_error(mock_get):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_global_api_error_aborts(mock_get):
-    mock_get.return_value = make_lastfm_response(
-        {"error": 10, "message": "Invalid API key"}
-    )
+def test_fetch_genres_global_api_error_aborts(mock_get) -> None:
+    mock_get.return_value = make_lastfm_response({
+        "error": 10,
+        "message": "Invalid API key",
+    })
 
     with pytest.raises(RuntimeError, match="Invalid API key"):
         fetch_genres("bad_api_key", {"Metallica"})
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_per_artist_error_continues(mock_get):
-    mock_get.return_value = make_lastfm_response(
-        {"error": 6, "message": "Artist not found"}
-    )
+def test_fetch_genres_per_artist_error_continues(mock_get) -> None:
+    mock_get.return_value = make_lastfm_response({
+        "error": 6,
+        "message": "Artist not found",
+    })
 
     artist_genre, metrics = fetch_genres("fake_api_key", {"Nonexistent Band"})
 
@@ -359,10 +358,11 @@ def test_fetch_genres_per_artist_error_continues(mock_get):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_rate_limit_error_aborts(mock_get):
-    mock_get.return_value = make_lastfm_response(
-        {"error": 29, "message": "Rate limit exceeded"}
-    )
+def test_fetch_genres_rate_limit_error_aborts(mock_get) -> None:
+    mock_get.return_value = make_lastfm_response({
+        "error": 29,
+        "message": "Rate limit exceeded",
+    })
 
     with pytest.raises(RuntimeError, match="Rate limit exceeded"):
         fetch_genres("fake_api_key", {"Some Artist"})
@@ -370,7 +370,7 @@ def test_fetch_genres_rate_limit_error_aborts(mock_get):
 
 @patch("main.time.sleep")
 @patch("main.lastfm_session.get")
-def test_fetch_genres_sleeps_only_for_uncached_requests(mock_get, mock_sleep):
+def test_fetch_genres_sleeps_only_for_uncached_requests(mock_get, mock_sleep) -> None:
     mock_get.return_value = make_lastfm_response(
         {"toptags": {"tag": [{"name": "metal"}]}},
         from_cache=False,
@@ -384,7 +384,7 @@ def test_fetch_genres_sleeps_only_for_uncached_requests(mock_get, mock_sleep):
 
 
 @patch("main.lastfm_session.get")
-def test_fetch_genres_handles_empty_artist_set(mock_get):
+def test_fetch_genres_handles_empty_artist_set(mock_get) -> None:
     artist_genre, metrics = fetch_genres("fake_api_key", set())
 
     assert artist_genre == {}
@@ -392,7 +392,7 @@ def test_fetch_genres_handles_empty_artist_set(mock_get):
     mock_get.assert_not_called()
 
 
-def test_save_output_creates_files():
+def test_save_output_creates_files() -> None:
     songs = [
         {
             "song": "Test Song",
@@ -420,7 +420,7 @@ def test_save_output_creates_files():
     assert mock_dump.call_args_list[1].kwargs == {"indent": 4, "ensure_ascii": False}
 
 
-def test_save_output_writes_real_json_files(monkeypatch):
+def test_save_output_writes_real_json_files(monkeypatch) -> None:
     songs = [
         {
             "song": "Test Song",
@@ -455,7 +455,7 @@ def test_save_output_writes_real_json_files(monkeypatch):
         os.remove(genres_path)
 
 
-def test_main_normalizes_playlist_url_and_saves_output(capsys):
+def test_main_normalizes_playlist_url_and_saves_output(capsys) -> None:
     with (
         patch(
             "main.argparse.ArgumentParser.parse_args",
@@ -495,9 +495,9 @@ def test_main_normalizes_playlist_url_and_saves_output(capsys):
     assert mock_fetch_tracks.call_args.args[1] == "test_playlist"
 
 
-def test_main_integration_writes_expected_files(monkeypatch, capsys):
+def test_main_integration_writes_expected_files(monkeypatch, capsys) -> None:
     class FakeSpotifyClient:
-        def __init__(self):
+        def __init__(self) -> None:
             self.requested_playlist = None
             self._page_one = {
                 "items": [
@@ -614,7 +614,7 @@ def test_main_integration_writes_expected_files(monkeypatch, capsys):
         os.remove(genres_path)
 
 
-def test_main_handles_lastfm_global_error(capsys):
+def test_main_handles_lastfm_global_error(capsys) -> None:
     with (
         patch(
             "main.argparse.ArgumentParser.parse_args",
@@ -647,7 +647,7 @@ def test_main_handles_lastfm_global_error(capsys):
     assert "Export complete!" not in captured.out
 
 
-def test_main_handles_authentication_failure(capsys):
+def test_main_handles_authentication_failure(capsys) -> None:
     with (
         patch(
             "main.argparse.ArgumentParser.parse_args",
@@ -661,7 +661,7 @@ def test_main_handles_authentication_failure(capsys):
     assert "Could not authenticate API data" in captured.out
 
 
-def test_main_rejects_blank_playlist_id(capsys):
+def test_main_rejects_blank_playlist_id(capsys) -> None:
     with (
         patch(
             "main.argparse.ArgumentParser.parse_args",
@@ -675,7 +675,7 @@ def test_main_rejects_blank_playlist_id(capsys):
     assert "Playlist ID cannot be blank" in captured.out
 
 
-def test_main_reports_empty_playlist(capsys):
+def test_main_reports_empty_playlist(capsys) -> None:
     with (
         patch(
             "main.argparse.ArgumentParser.parse_args",
@@ -690,7 +690,7 @@ def test_main_reports_empty_playlist(capsys):
     assert "Playlist is empty or only contains unsupported items" in captured.out
 
 
-def test_main_handles_save_output_error(capsys):
+def test_main_handles_save_output_error(capsys) -> None:
     with (
         patch(
             "main.argparse.ArgumentParser.parse_args",

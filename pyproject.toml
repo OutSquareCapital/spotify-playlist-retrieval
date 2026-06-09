@@ -1,54 +1,47 @@
-[build-system]
-requires = ["setuptools>=69"]
-build-backend = "setuptools.build_meta"
 
 [project]
-name = "spotify-playlist-retrieval"
-version = "0.1.0"
-description = "Export Spotify playlist tracks to JSON with Last.fm genre enrichment."
-readme = "README.md"
-requires-python = ">=3.10"
-license = { text = "MIT" }
-dependencies = [
-    "python-dotenv",
-    "requests",
-    "requests-cache",
-    "spotipy",
-    "tqdm",
-]
+    dependencies = [
+        "loguru>=0.7.3",
+        "python-dotenv",
+        "requests",
+        "requests-cache",
+        "spotipy",
+        "tqdm",
+        "typer>=0.26.7",
+    ]
+    description = "Export Spotify playlist tracks to JSON with Last.fm genre enrichment."
+    license = { text = "MIT" }
+    name = "spotiplaylist"
+    readme = "README.md"
+    requires-python = ">=3.13"
+    version = "0.1.0"
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8,<9",
-]
+    [project.scripts]
+        spotiplaylist = "main:main"
 
-[project.scripts]
-spotify-playlist-retrieval = "main:main"
-
-[project.urls]
-Repository = "https://github.com/QuothTheRaven42/Spotify-Playlist-Retrieval"
-
-[tool.setuptools]
-py-modules = ["main"]
-
-[tool.pytest.ini_options]
-addopts = "-p no:cacheprovider"
-python_files = ["test_*.py"]
-testpaths = ["."]
-norecursedirs = [
-    ".venv",
-    ".pytest_cache",
-    ".pytest_cache_local",
-    ".pytest_tmp",
-    ".pytest_tmp*",
-    "tmp*",
-    "__pycache__",
-    ".mypy_cache",
-    ".idea",
-    "pytest-cache-files-*",
-]
+    [project.urls]
+        Repository = "https://github.com/QuothTheRaven42/Spotify-Playlist-Retrieval"
 
 [dependency-groups]
-dev = [
-    "pyrefly>=1.0.0",
-]
+    dev = ["pyrefly>=1.0.0", "pytest>=8,<9"]
+
+[tool.pytest.ini_options]
+    addopts = "-p no:cacheprovider"
+    norecursedirs = [
+        ".idea",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".pytest_cache_local",
+        ".pytest_tmp",
+        ".pytest_tmp*",
+        ".venv",
+        "__pycache__",
+        "pytest-cache-files-*",
+        "tmp*",
+    ]
+    python_files = ["test_*.py"]
+    testpaths = ["."]
+
+[build-system]
+    build-backend = "uv_build"
+    requires      = ["uv_build>=0.8.15,<0.9.0"]

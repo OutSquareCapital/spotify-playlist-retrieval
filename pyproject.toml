@@ -47,3 +47,8 @@ norecursedirs = [
     ".idea",
     "pytest-cache-files-*",
 ]
+
+[dependency-groups]
+dev = [
+    "pyrefly>=1.0.0",
+]

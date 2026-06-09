@@ -1,4 +1,3 @@
-from unittest.mock import Mock
 import json
 import os
 import tempfile
@@ -105,7 +104,12 @@ def test_authenticate_returns_client_and_lastfm_key(
     mock_spotify_client.assert_called_once_with(auth_manager=auth_manager)
 
 
-def make_track_item(name: str="Song", artist: str="Artist", album: str="Album", duration_ms: int=200000):
+def make_track_item(
+    name: str = "Song",
+    artist: str = "Artist",
+    album: str = "Album",
+    duration_ms: int = 200000,
+) -> dict[str, dict[str, int | list[dict[str, str]] | str | dict[str, str]]]:
     return {
         "item": {
             "type": "track",
@@ -261,7 +265,7 @@ def test_fetch_tracks_deduplicates_artists() -> None:
     assert artists == {"Same Artist", "Different Artist"}
 
 
-def make_lastfm_response(payload, *, from_cache=True) -> Mock:
+def make_lastfm_response(payload, *, from_cache: bool = True) -> Mock:
     response = Mock()
     response.from_cache = from_cache
     response.raise_for_status = Mock()

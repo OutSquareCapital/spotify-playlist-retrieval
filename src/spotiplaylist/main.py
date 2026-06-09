@@ -1,34 +1,35 @@
 import argparse
 import json
-import logging
 import os
 import time
+from pathlib import Path
+from typing import Any
 
 import requests
 import requests_cache
 import spotipy
 from dotenv import load_dotenv
+from loguru import logger
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 from tqdm import tqdm
 
-GENRES_OUTPUT_FILE = "genres.json"
-MUSIC_OUTPUT_FILE = "music.json"
+GENRES_OUTPUT = Path("genres.json")
+MUSIC_OUTPUT = Path("music.json")
+LOG = Path("log.log")
 LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
 LASTFM_CACHE_NAME = "lastfm_cache"
 LASTFM_CACHE_TTL_SECONDS = 86400
-LOG_FILE = "log.log"
 SPOTIFY_SCOPE = "playlist-read-private playlist-read-collaborative"
 UNKNOWN_GENRE = "unknown"
 
-SongRecord = dict[str, str]
-GenreMetrics = dict[str, float | int]
+type SongRecord = dict[str, str]
+type GenreMetrics = dict[str, float | int]
 
-logging.basicConfig(filename=LOG_FILE, level=logging.ERROR)
+logger.add(LOG, level="ERROR")
 
 # Cache only Last.fm calls so repeated runs do not hammer the API.
 lastfm_session = requests_cache.CachedSession(
-    LASTFM_CACHE_NAME,
-    expire_after=LASTFM_CACHE_TTL_SECONDS,
+    LASTFM_CACHE_NAME, expire_after=LASTFM_CACHE_TTL_SECONDS
 )
 
 GLOBAL_LASTFM_ERROR_CODES = {
@@ -47,7 +48,8 @@ GLOBAL_LASTFM_ERROR_CODES = {
 def ms_to_time(ms: int) -> str:
     """Convert milliseconds to an MM:SS formatted string."""
     if ms < 0:
-        raise ValueError("Track duration cannot be negative.")
+        msg = "Track duration cannot be negative."
+        raise ValueError(msg)
 
     total_seconds = ms // 1000
     minutes, seconds = divmod(total_seconds, 60)
@@ -71,9 +73,8 @@ def authenticate() -> tuple[spotipy.Spotify, str]:
         )
     except KeyError as error:
         missing_key = error.args[0]
-        raise ValueError(
-            f"Missing {missing_key} environment variable. Check your .env file."
-        ) from None
+        msg = f"Missing {missing_key} environment variable. Check your .env file."
+        raise ValueError(msg) from None
 
     spotify_client = spotipy.Spotify(
         auth_manager=SpotifyOAuth(
@@ -99,7 +100,7 @@ def normalize_playlist_id(playlist_value: str) -> str:
     return playlist_id.strip("/ ")
 
 
-def build_song_record(track: dict) -> SongRecord | None:
+def build_song_record(track: dict[str, Any]) -> SongRecord | None:
     """Build a song record from a Spotify track object."""
     track_name = track.get("name")
     artists = track.get("artists")
@@ -134,7 +135,7 @@ def fetch_tracks(
     """Fetch playlist tracks and return song records plus unique artist names."""
     songs: list[SongRecord] = []
     unique_artists: set[str] = set()
-    results = sp.playlist_items(playlist)
+    results: dict[str, dict[str, Any]] = sp.playlist_items(playlist)
 
     while True:
         for item in results.get("items", []):
@@ -144,7 +145,7 @@ def fetch_tracks(
 
             song = build_song_record(track)
             if song is None:
-                logging.error(
+                logger.error(
                     "Skipping malformed track data for playlist '%s': %s",
                     playlist,
                     track.get("name", "<unknown>"),
@@ -156,7 +157,7 @@ def fetch_tracks(
 
         if not results.get("next"):
             break
-        results = sp.next(results)
+        results: dict[str, dict[str, Any]] = sp.next(results)
 
     return songs, unique_artists
 
@@ -192,20 +193,18 @@ def fetch_genres(
             response.raise_for_status()
             data = response.json()
             if not isinstance(data, dict):
-                raise json.JSONDecodeError(
-                    "Last.fm returned a non-object response.",
-                    str(data),
-                    0,
-                )
+                msg = "Last.fm returned a non-object response."
+                raise json.JSONDecodeError(msg, str(data), 0)
 
             if "error" in data:
                 error_code = data.get("error")
                 message = data.get("message", "Unknown Last.fm error")
 
                 if error_code in GLOBAL_LASTFM_ERROR_CODES:
-                    raise RuntimeError(f"Last.fm API error {error_code}: {message}")
+                    msg = f"Last.fm API error {error_code}: {message}"
+                    raise RuntimeError(msg)
 
-                logging.error(
+                logger.error(
                     "Last.fm API error for %s: %s - %s",
                     artist,
                     error_code,
@@ -232,7 +231,7 @@ def fetch_genres(
                 time.sleep(1)
 
         except (requests.exceptions.RequestException, json.JSONDecodeError) as error:
-            logging.exception("Failed to get genre for %s: %s", artist, error)
+            logger.exception("Failed to get genre for %s: %s", artist, error)
             artists_genres[artist] = UNKNOWN_GENRE
             error_count += 1
 
@@ -245,10 +244,10 @@ def fetch_genres(
 
 def save_output(songs: list[SongRecord], artists_genres: dict[str, str]) -> None:
     """Write playlist output files to disk."""
-    with open(GENRES_OUTPUT_FILE, "w", encoding="utf-8") as genre_file:
+    with GENRES_OUTPUT.open("w", encoding="utf-8") as genre_file:
         json.dump(artists_genres, genre_file, indent=4, ensure_ascii=False)
 
-    with open(MUSIC_OUTPUT_FILE, "w", encoding="utf-8") as music_file:
+    with MUSIC_OUTPUT.open("w", encoding="utf-8") as music_file:
         json.dump(songs, music_file, indent=4, ensure_ascii=False)
 
 
@@ -263,7 +262,7 @@ def main() -> None:
     try:
         sp, lastfm_api = authenticate()
     except (SpotifyOauthError, ValueError) as error:
-        logging.exception("Failed to authenticate Spotify authorization: %s", error)
+        logger.exception("Failed to authenticate Spotify authorization: %s", error)
         print("Error: Could not authenticate API data. Please check the .env file.")
         return
 
@@ -276,7 +275,7 @@ def main() -> None:
     try:
         songs, unique_artists = fetch_tracks(sp, playlist_id)
     except spotipy.exceptions.SpotifyException as error:
-        logging.exception("Failed to fetch tracks for %s: %s", playlist_id, error)
+        logger.exception("Failed to fetch tracks for %s: %s", playlist_id, error)
         print(
             "Error: Could not retrieve playlist. Verify the playlist ID and that your account has access to it."
         )
@@ -294,7 +293,7 @@ def main() -> None:
         print("Export cancelled.")
         return
     except RuntimeError as error:
-        logging.exception("Last.fm API failure: %s", error)
+        logger.exception("Last.fm API failure: %s", error)
         print(f"Error: {error}")
         print("Genre lookup aborted. Please try again or check your Last.fm API key.")
         return
@@ -310,12 +309,12 @@ def main() -> None:
     try:
         save_output(songs, artists_genres)
     except OSError as error:
-        logging.exception("Failed to save output for %s: %s", playlist_id, error)
+        logger.exception("Failed to save output for %s: %s", playlist_id, error)
         print("Unable to save file.")
         return
 
     print(
-        f"Export complete! Playlist data saved to {MUSIC_OUTPUT_FILE} and {GENRES_OUTPUT_FILE}."
+        f"Export complete! Playlist data saved to {MUSIC_OUTPUT} and {GENRES_OUTPUT}."
     )
 
 

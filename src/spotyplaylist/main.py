@@ -6,9 +6,9 @@ import time
 
 import requests
 import requests_cache
-import spotipy  # type: ignore
+import spotipy
 from dotenv import load_dotenv
-from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError  # type: ignore
+from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 from tqdm import tqdm
 
 GENRES_OUTPUT_FILE = "genres.json"
@@ -232,7 +232,7 @@ def fetch_genres(
                 time.sleep(1)
 
         except (requests.exceptions.RequestException, json.JSONDecodeError) as error:
-            logging.error("Failed to get genre for %s: %s", artist, error)
+            logging.exception("Failed to get genre for %s: %s", artist, error)
             artists_genres[artist] = UNKNOWN_GENRE
             error_count += 1
 
@@ -263,15 +263,11 @@ def main() -> None:
     try:
         sp, lastfm_api = authenticate()
     except (SpotifyOauthError, ValueError) as error:
-        logging.error("Failed to authenticate Spotify authorization: %s", error)
+        logging.exception("Failed to authenticate Spotify authorization: %s", error)
         print("Error: Could not authenticate API data. Please check the .env file.")
         return
 
-    raw_playlist_value = (
-        args.playlist_id
-        if args.playlist_id
-        else input("Enter Spotify playlist ID or URL: ")
-    )
+    raw_playlist_value = args.playlist_id or input("Enter Spotify playlist ID or URL: ")
     playlist_id = normalize_playlist_id(raw_playlist_value)
     if not playlist_id:
         print("Error: Playlist ID cannot be blank.")
@@ -280,7 +276,7 @@ def main() -> None:
     try:
         songs, unique_artists = fetch_tracks(sp, playlist_id)
     except spotipy.exceptions.SpotifyException as error:
-        logging.error("Failed to fetch tracks for %s: %s", playlist_id, error)
+        logging.exception("Failed to fetch tracks for %s: %s", playlist_id, error)
         print(
             "Error: Could not retrieve playlist. Verify the playlist ID and that your account has access to it."
         )
@@ -298,7 +294,7 @@ def main() -> None:
         print("Export cancelled.")
         return
     except RuntimeError as error:
-        logging.error("Last.fm API failure: %s", error)
+        logging.exception("Last.fm API failure: %s", error)
         print(f"Error: {error}")
         print("Genre lookup aborted. Please try again or check your Last.fm API key.")
         return
@@ -314,7 +310,7 @@ def main() -> None:
     try:
         save_output(songs, artists_genres)
     except OSError as error:
-        logging.error("Failed to save output for %s: %s", playlist_id, error)
+        logging.exception("Failed to save output for %s: %s", playlist_id, error)
         print("Unable to save file.")
         return
 

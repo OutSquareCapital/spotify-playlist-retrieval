@@ -1,5 +1,0 @@
-spotipy
-python-dotenv
-requests
-tqdm
-requests-cache
